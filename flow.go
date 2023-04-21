@@ -59,7 +59,7 @@ func (f *UnfinishedFlow) AddTransitions(transitions ...Transition) {
 	}
 }
 
-func (f Flow) CheckRequest(asset interface{}, action string) (string, error) {
+func (f Flow) TakeAction(asset interface{}, action string) (string, error) {
 	// check if asset is a pointer
 	if !isPointer(asset) {
 		return INVALID, fmt.Errorf("please pass a pointer to your asset in CheckRequest()")
@@ -80,6 +80,9 @@ func (f Flow) CheckRequest(asset interface{}, action string) (string, error) {
 	if err != nil {
 		return INVALID, err
 	}
+
+	// add origin stage flag to our validations
+	validations.AddFlag(fmt.Sprintf(originStageFlag, status), true)
 
 	// check if current stage is part of our flow
 	stage, OK := f.stages[status]

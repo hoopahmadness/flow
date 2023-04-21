@@ -19,6 +19,9 @@ const (
 	actionGrow   = "grow"
 	actionEmerge = "emerge"
 	actionSeen   = "seen"
+
+	// simplified action for an alternate flow where one action is meant to be used across various stages
+	actionAge = "age" // replaces hatch, grow, and emerge but distinct from seen
 )
 
 type Butterfly struct {
@@ -70,7 +73,7 @@ func getButterflyContext(asset interface{}) (ValidationTable, error) {
 // coccoons are also safe from being eaten
 // Some butterflies (the brown ones) are secretly moths! So when they EMERGE they are moths, not butterflies
 // Make sure your strings match up! Using constants is best
-func generateFlow() Flow {
+func generateGranularFlow() Flow {
 	// generate a flow object with setters and getters for butterfly struct
 	tempButterflyFlow := NewFlow(getButterflyStatus, setButterflyStatus, getButterflyContext)
 
@@ -86,7 +89,7 @@ func generateFlow() Flow {
 	cocoonStage := NewStage(stageCocoon) // cocoons can't be seen, so we don't add the SEEN transition
 	cocoonStage.AddTransition(actionEmerge)
 
-	butterflyStage := NewStage(stageButterfly) // butterflies can't grow any more, they just eventually get seen and eaten
+	butterflyStage := NewStage(stageButterfly) // butterflies and moths can't grow any more, they just eventually get seen and eaten
 	butterflyStage.AddTransition(actionSeen)
 
 	mothStage := NewStage(stageMoth)
@@ -124,17 +127,68 @@ func generateFlow() Flow {
 	return butterflyFlow
 }
 
+// Same flow as above, but all growing actions are replaced with the simplified Age action
+func generateSimpleFlow() Flow {
+	// generate a flow object with setters and getters for butterfly struct
+	tempButterflyFlow := NewFlow(getButterflyStatus, setButterflyStatus, getButterflyContext)
+
+	// Generate all stages, adding transiton names as we go
+	eggStage := NewStage(stageEgg)
+	eggStage.AddTransition(actionAge)
+	eggStage.AddTransition(actionSeen)
+
+	catStage := NewStage(stageCaterpillar)
+	catStage.AddTransition(actionAge)
+	catStage.AddTransition(actionSeen)
+
+	cocoonStage := NewStage(stageCocoon) // cocoons can't be seen, so we don't add the SEEN transition
+	cocoonStage.AddTransition(actionAge)
+
+	butterflyStage := NewStage(stageButterfly) // butterflies and moths can't grow any more, they just eventually get seen and eaten
+	butterflyStage.AddTransition(actionSeen)
+
+	mothStage := NewStage(stageMoth)
+	mothStage.AddTransition(actionSeen)
+
+	// generate some validation tables
+	blankTable, _ := NewValidationTable()                    // for all those actions that don't need extra validation
+	seenValidator, _ := NewValidationTable("isGreen", false) // you can only be seen if you aren't green
+	mothValidator, _ := NewValidationTable("isBrown", true)  // only brown bugs turn into moths
+	// if you want to make tweaks to an existing table instead of starting over, make a copy
+	mothInvalid := mothValidator.MakeCopy()
+	mothInvalid.AddFlag("isBrown", false)
+
+	// generate all transitions, adding optional validation tables as we go
+	ageTran := newTransition(actionAge)
+	ageTran.AddStage(stageCaterpillar, blankTable, stageEgg)    // The same transition can have different outcomes
+	ageTran.AddStage(stageCocoon, blankTable, stageCaterpillar) // just based on the stage
+	ageTran.AddStage(stageButterfly, mothInvalid, stageCocoon)
+	ageTran.AddStage(stageMoth, mothValidator, stageCocoon) // since EMERGE has two possible outcomes, we use validation tables to choose between them
+
+	seenTran := newTransition(actionSeen)        // there's only one possible outcome but we still use a validation table
+	seenTran.AddStage(stageEaten, seenValidator) // attempting to SEEN a green bug will return an error
+
+	// add all the stages and transitions to the flow
+	tempButterflyFlow.AddStages(eggStage, catStage, cocoonStage, butterflyStage, mothStage)
+	tempButterflyFlow.AddTransitions(ageTran, seenTran)
+
+	// you can't use a flow until you Finish it
+	butterflyFlow := tempButterflyFlow.Finish()
+
+	return butterflyFlow
+}
+
 type butterflyTest struct {
 	action    string
 	result    string
 	wantError bool
 }
 
-func runButterflyTests(bug *Butterfly, testBatch []butterflyTest, t *testing.T) {
+func runButterflyTests(bug *Butterfly, testBatch []butterflyTest, generateFlow func() Flow, t *testing.T) {
 	flow := generateFlow()
 
 	for _, test := range testBatch {
-		change, err := flow.CheckRequest(bug, test.action)
+		change, err := flow.TakeAction(bug, test.action)
 		if err != nil && !test.wantError {
 			t.Error(err)
 			t.Fail()
@@ -157,7 +211,7 @@ func runButterflyTests(bug *Butterfly, testBatch []butterflyTest, t *testing.T) 
 
 func TestSafeButterfliesHappy(t *testing.T) {
 	// test happy path, show terminal stage (can't progress further)
-	happyPath := []butterflyTest{
+	happyPathGranular := []butterflyTest{
 		{
 			action:    actionHatch,
 			result:    stageCaterpillar,
@@ -179,19 +233,53 @@ func TestSafeButterfliesHappy(t *testing.T) {
 			wantError: true,
 		},
 	}
+	happyPathSimplified := []butterflyTest{
+		{
+			action:    actionAge,
+			result:    stageCaterpillar,
+			wantError: false,
+		},
+		{
+			action:    actionAge,
+			result:    stageCocoon,
+			wantError: false,
+		},
+		{
+			action:    actionAge,
+			result:    stageButterfly,
+			wantError: false,
+		},
+		{
+			action:    actionAge,
+			result:    INVALID,
+			wantError: true,
+		},
+	}
 	Rodney := Butterfly{
 		color:     "yellow",
 		lifeStage: stageEgg,
 	}
+	Riley := Butterfly{
+		color:     "yellow",
+		lifeStage: stageEgg,
+	}
 
-	runButterflyTests(&Rodney, happyPath, t)
+	runButterflyTests(&Rodney, happyPathGranular, generateGranularFlow, t)
+	runButterflyTests(&Riley, happyPathSimplified, generateSimpleFlow, t)
 }
 
 func TestSafeButterfliesBranch(t *testing.T) {
 	// one bug becomes a butterfly, the other a moth
-	butterflyPath := []butterflyTest{
+	butterflyPathGranular := []butterflyTest{
 		{
 			action:    actionEmerge,
+			result:    stageButterfly,
+			wantError: false,
+		},
+	}
+	butterflyPathSimplified := []butterflyTest{
+		{
+			action:    actionAge,
 			result:    stageButterfly,
 			wantError: false,
 		},
@@ -200,12 +288,24 @@ func TestSafeButterfliesBranch(t *testing.T) {
 		color:     "green",
 		lifeStage: stageCocoon,
 	}
+	Jennifer := Butterfly{
+		color:     "green",
+		lifeStage: stageCocoon,
+	}
 
-	runButterflyTests(&Janice, butterflyPath, t)
+	runButterflyTests(&Janice, butterflyPathGranular, generateGranularFlow, t)
+	runButterflyTests(&Jennifer, butterflyPathSimplified, generateSimpleFlow, t)
 
-	mothPath := []butterflyTest{
+	mothPathGranular := []butterflyTest{
 		{
 			action:    actionEmerge,
+			result:    stageMoth,
+			wantError: false,
+		},
+	}
+	mothPathSimplified := []butterflyTest{
+		{
+			action:    actionAge,
 			result:    stageMoth,
 			wantError: false,
 		},
@@ -214,13 +314,18 @@ func TestSafeButterfliesBranch(t *testing.T) {
 		color:     "brown",
 		lifeStage: stageCocoon,
 	}
+	Sidney := Butterfly{
+		color:     "brown",
+		lifeStage: stageCocoon,
+	}
 
-	runButterflyTests(&Sandy, mothPath, t)
+	runButterflyTests(&Sandy, mothPathGranular, generateGranularFlow, t)
+	runButterflyTests(&Sidney, mothPathSimplified, generateSimpleFlow, t)
 }
 
 func TestSafeButterfliesGetEaten(t *testing.T) {
-	// Quincy is safe as a cocoon but doesn't make it as a butterfly
-	eatenPath := []butterflyTest{
+	// Quincy and Quinton are safe as cocoons but don't make it as butterflies
+	eatenPathGranular := []butterflyTest{
 		{
 			action:    actionSeen,
 			result:    INVALID,
@@ -237,10 +342,32 @@ func TestSafeButterfliesGetEaten(t *testing.T) {
 			wantError: false,
 		},
 	}
+	eatenPathSimplified := []butterflyTest{
+		{
+			action:    actionSeen,
+			result:    INVALID,
+			wantError: true,
+		},
+		{
+			action:    actionAge,
+			result:    stageButterfly,
+			wantError: false,
+		},
+		{
+			action:    actionSeen,
+			result:    stageEaten,
+			wantError: false,
+		},
+	}
 	Quincy := Butterfly{
 		color:     "red",
 		lifeStage: stageCocoon,
 	}
-	runButterflyTests(&Quincy, eatenPath, t)
+	Quinton := Butterfly{
+		color:     "red",
+		lifeStage: stageCocoon,
+	}
+	runButterflyTests(&Quincy, eatenPathGranular, generateGranularFlow, t)
+	runButterflyTests(&Quinton, eatenPathSimplified, generateSimpleFlow, t)
 
 }

@@ -2,6 +2,7 @@ package flowchart
 
 import (
 	"errors"
+	"fmt"
 )
 
 type Transition struct {
@@ -16,8 +17,17 @@ func newTransition(name string) Transition {
 	}
 }
 
-func (t *Transition) AddStage(stage string, valTable ValidationTable) {
-	t.NextStages[valTable.toString()] = stage
+func (t *Transition) AddStage(stage string, valTable ValidationTable, originStages ...string) {
+	if len(originStages) == 0 {
+		t.NextStages[valTable.toString()] = stage
+		return
+	}
+	for _, origin := range originStages {
+		valTableWithOrigin := valTable.MakeCopy()
+		originFlag := fmt.Sprintf(originStageFlag, origin)
+		valTableWithOrigin.AddFlag(originFlag, true)
+		t.NextStages[valTableWithOrigin.toString()] = stage
+	}
 }
 
 func (t Transition) getOutcome(incomingTable ValidationTable) (string, error) {
