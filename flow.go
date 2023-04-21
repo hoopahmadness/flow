@@ -81,6 +81,9 @@ func (f Flow) TakeAction(asset interface{}, action string) (string, error) {
 		return INVALID, err
 	}
 
+	// add origin stage flag to our validations
+	validations.AddFlag(fmt.Sprintf(originStageFlag, status), true)
+
 	// check if current stage is part of our flow
 	stage, OK := f.stages[status]
 	if !OK {

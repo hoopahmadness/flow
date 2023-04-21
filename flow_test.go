@@ -127,6 +127,57 @@ func generateGranularFlow() Flow {
 	return butterflyFlow
 }
 
+// Same flow as above, but all growing actions are replaced with the simplified Age action
+func generateSimpleFlow() Flow {
+	// generate a flow object with setters and getters for butterfly struct
+	tempButterflyFlow := NewFlow(getButterflyStatus, setButterflyStatus, getButterflyContext)
+
+	// Generate all stages, adding transiton names as we go
+	eggStage := NewStage(stageEgg)
+	eggStage.AddTransition(actionAge)
+	eggStage.AddTransition(actionSeen)
+
+	catStage := NewStage(stageCaterpillar)
+	catStage.AddTransition(actionAge)
+	catStage.AddTransition(actionSeen)
+
+	cocoonStage := NewStage(stageCocoon) // cocoons can't be seen, so we don't add the SEEN transition
+	cocoonStage.AddTransition(actionAge)
+
+	butterflyStage := NewStage(stageButterfly) // butterflies and moths can't grow any more, they just eventually get seen and eaten
+	butterflyStage.AddTransition(actionSeen)
+
+	mothStage := NewStage(stageMoth)
+	mothStage.AddTransition(actionSeen)
+
+	// generate some validation tables
+	blankTable, _ := NewValidationTable()                    // for all those actions that don't need extra validation
+	seenValidator, _ := NewValidationTable("isGreen", false) // you can only be seen if you aren't green
+	mothValidator, _ := NewValidationTable("isBrown", true)  // only brown bugs turn into moths
+	// if you want to make tweaks to an existing table instead of starting over, make a copy
+	mothInvalid := mothValidator.MakeCopy()
+	mothInvalid.AddFlag("isBrown", false)
+
+	// generate all transitions, adding optional validation tables as we go
+	ageTran := newTransition(actionAge)
+	ageTran.AddStage(stageCaterpillar, blankTable, stageEgg)    // The same transition can have different outcomes
+	ageTran.AddStage(stageCocoon, blankTable, stageCaterpillar) // just based on the stage
+	ageTran.AddStage(stageButterfly, mothInvalid, stageCocoon)
+	ageTran.AddStage(stageMoth, mothValidator, stageCocoon) // since EMERGE has two possible outcomes, we use validation tables to choose between them
+
+	seenTran := newTransition(actionSeen)        // there's only one possible outcome but we still use a validation table
+	seenTran.AddStage(stageEaten, seenValidator) // attempting to SEEN a green bug will return an error
+
+	// add all the stages and transitions to the flow
+	tempButterflyFlow.AddStages(eggStage, catStage, cocoonStage, butterflyStage, mothStage)
+	tempButterflyFlow.AddTransitions(ageTran, seenTran)
+
+	// you can't use a flow until you Finish it
+	butterflyFlow := tempButterflyFlow.Finish()
+
+	return butterflyFlow
+}
+
 type butterflyTest struct {
 	action    string
 	result    string
@@ -214,6 +265,7 @@ func TestSafeButterfliesHappy(t *testing.T) {
 	}
 
 	runButterflyTests(&Rodney, happyPathGranular, generateGranularFlow, t)
+	runButterflyTests(&Riley, happyPathSimplified, generateSimpleFlow, t)
 }
 
 func TestSafeButterfliesBranch(t *testing.T) {
@@ -241,7 +293,8 @@ func TestSafeButterfliesBranch(t *testing.T) {
 		lifeStage: stageCocoon,
 	}
 
-	runButterflyTests(&Janice, butterflyPath, t)
+	runButterflyTests(&Janice, butterflyPathGranular, generateGranularFlow, t)
+	runButterflyTests(&Jennifer, butterflyPathSimplified, generateSimpleFlow, t)
 
 	mothPathGranular := []butterflyTest{
 		{
@@ -252,7 +305,7 @@ func TestSafeButterfliesBranch(t *testing.T) {
 	}
 	mothPathSimplified := []butterflyTest{
 		{
-			action:    actionEmerge,
+			action:    actionAge,
 			result:    stageMoth,
 			wantError: false,
 		},
@@ -266,7 +319,8 @@ func TestSafeButterfliesBranch(t *testing.T) {
 		lifeStage: stageCocoon,
 	}
 
-	runButterflyTests(&Sandy, mothPath, t)
+	runButterflyTests(&Sandy, mothPathGranular, generateGranularFlow, t)
+	runButterflyTests(&Sidney, mothPathSimplified, generateSimpleFlow, t)
 }
 
 func TestSafeButterfliesGetEaten(t *testing.T) {
@@ -313,6 +367,7 @@ func TestSafeButterfliesGetEaten(t *testing.T) {
 		color:     "red",
 		lifeStage: stageCocoon,
 	}
-	runButterflyTests(&Quincy, eatenPath, generateGranularFlow, t)
+	runButterflyTests(&Quincy, eatenPathGranular, generateGranularFlow, t)
+	runButterflyTests(&Quinton, eatenPathSimplified, generateSimpleFlow, t)
 
 }
