@@ -59,7 +59,7 @@ func (f *UnfinishedFlow) AddTransitions(transitions ...Transition) {
 	}
 }
 
-func (f Flow) CheckRequest(asset interface{}, action string) (string, error) {
+func (f Flow) TakeAction(asset interface{}, action string) (string, error) {
 	// check if asset is a pointer
 	if !isPointer(asset) {
 		return INVALID, fmt.Errorf("please pass a pointer to your asset in CheckRequest()")
