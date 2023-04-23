@@ -10,7 +10,7 @@ type Transition struct {
 	NextStages map[ValidationString]string `json:"nextStages"`
 }
 
-func newTransition(name string) Transition {
+func NewTransition(name string) Transition {
 	return Transition{
 		Name:       name,
 		NextStages: map[ValidationString]string{},

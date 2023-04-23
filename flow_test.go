@@ -104,17 +104,17 @@ func generateGranularFlow() Flow {
 	mothInvalid.AddFlag("isBrown", false)
 
 	// generate all transitions, adding optional validation tables as we go
-	hatchTran := newTransition(actionHatch)
+	hatchTran := NewTransition(actionHatch)
 	hatchTran.AddStage(stageCaterpillar, blankTable) // there's no validation needed to hatch
 
-	growTran := newTransition(actionGrow)
+	growTran := NewTransition(actionGrow)
 	growTran.AddStage(stageCocoon, blankTable)
 
-	emergeTran := newTransition(actionEmerge)
+	emergeTran := NewTransition(actionEmerge)
 	emergeTran.AddStage(stageButterfly, mothInvalid)
 	emergeTran.AddStage(stageMoth, mothValidator) // since EMERGE has two possible outcomes, we use validation tables to choose between them
 
-	seenTran := newTransition(actionSeen)        // there's only one possible outcome but we still use a validation table
+	seenTran := NewTransition(actionSeen)        // there's only one possible outcome but we still use a validation table
 	seenTran.AddStage(stageEaten, seenValidator) // attempting to SEEN a green bug will return an error
 
 	// add all the stages and transitions to the flow
@@ -159,13 +159,13 @@ func generateSimpleFlow() Flow {
 	mothInvalid.AddFlag("isBrown", false)
 
 	// generate all transitions, adding optional validation tables as we go
-	ageTran := newTransition(actionAge)
+	ageTran := NewTransition(actionAge)
 	ageTran.AddStage(stageCaterpillar, blankTable, stageEgg)    // The same transition can have different outcomes
 	ageTran.AddStage(stageCocoon, blankTable, stageCaterpillar) // just based on the stage
 	ageTran.AddStage(stageButterfly, mothInvalid, stageCocoon)
 	ageTran.AddStage(stageMoth, mothValidator, stageCocoon) // since EMERGE has two possible outcomes, we use validation tables to choose between them
 
-	seenTran := newTransition(actionSeen)        // there's only one possible outcome but we still use a validation table
+	seenTran := NewTransition(actionSeen)        // there's only one possible outcome but we still use a validation table
 	seenTran.AddStage(stageEaten, seenValidator) // attempting to SEEN a green bug will return an error
 
 	// add all the stages and transitions to the flow
