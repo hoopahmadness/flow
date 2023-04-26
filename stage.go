@@ -12,6 +12,6 @@ func NewStage(name string) Stage {
 	}
 }
 
-func (s *Stage) AddTransition(t string) {
+func (s *Stage) addTransition(t string) {
 	s.Transitions = append(s.Transitions, t)
 }

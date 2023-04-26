@@ -17,17 +17,28 @@ func NewTransition(name string) Transition {
 	}
 }
 
-func (t *Transition) AddStage(stage string, valTable ValidationTable, originStages ...string) {
-	if len(originStages) == 0 {
-		t.NextStages[valTable.toString()] = stage
-		return
+func (t *Transition) AddStage(originStage *Stage, nextSteps ...interface{}) error {
+	if originStage == nil {
+		return fmt.Errorf("Unable to add stage with nil origin")
 	}
-	for _, origin := range originStages {
-		valTableWithOrigin := valTable.MakeCopy()
-		originFlag := fmt.Sprintf(originStageFlag, origin)
-		valTableWithOrigin.AddFlag(originFlag, true)
-		t.NextStages[valTableWithOrigin.toString()] = stage
+	if len(nextSteps)%2 != 0 {
+		return fmt.Errorf("Pairs of validation tables and destination stages are required for next steps")
 	}
+	originStage.addTransition(t.Name)
+	for ii := 0; ii < len(nextSteps); ii += 2 {
+		valTable, OK := nextSteps[ii].(ValidationTable)
+		if !OK {
+			return fmt.Errorf("Expected a valudation table, got %T", nextSteps[ii])
+		}
+		nextStage, OK := nextSteps[ii+1].(Stage)
+		if !OK {
+			return fmt.Errorf("Expected a destination stage, got %T", nextSteps[ii+1])
+		}
+		originFlag := fmt.Sprintf(originStageFlag, originStage.Name)
+		valTable.AddFlag(originFlag, true)
+		t.NextStages[valTable.toString()] = nextStage.Name
+	}
+	return nil
 }
 
 func (t Transition) getOutcome(incomingTable ValidationTable) (string, error) {

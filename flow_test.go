@@ -2,6 +2,7 @@ package flowchart
 
 import (
 	"errors"
+	"fmt"
 	"testing"
 )
 
@@ -72,28 +73,22 @@ func getButterflyContext(asset interface{}) (ValidationTable, error) {
 // At almost any point it can be seen and eaten by a bird, but this only happens to non-green ones
 // coccoons are also safe from being eaten
 // Some butterflies (the brown ones) are secretly moths! So when they EMERGE they are moths, not butterflies
-// Make sure your strings match up! Using constants is best
 func generateGranularFlow() Flow {
 	// generate a flow object with setters and getters for butterfly struct
 	tempButterflyFlow := NewFlow(getButterflyStatus, setButterflyStatus, getButterflyContext)
 
-	// Generate all stages, adding transiton names as we go
+	// Generate all stages
 	eggStage := NewStage(stageEgg)
-	eggStage.AddTransition(actionHatch)
-	eggStage.AddTransition(actionSeen)
 
 	catStage := NewStage(stageCaterpillar)
-	catStage.AddTransition(actionGrow)
-	catStage.AddTransition(actionSeen)
 
-	cocoonStage := NewStage(stageCocoon) // cocoons can't be seen, so we don't add the SEEN transition
-	cocoonStage.AddTransition(actionEmerge)
+	cocoonStage := NewStage(stageCocoon)
 
 	butterflyStage := NewStage(stageButterfly) // butterflies and moths can't grow any more, they just eventually get seen and eaten
-	butterflyStage.AddTransition(actionSeen)
 
 	mothStage := NewStage(stageMoth)
-	mothStage.AddTransition(actionSeen)
+
+	eatenStage := NewStage(stageEaten)
 
 	// generate some validation tables
 	blankTable, _ := NewValidationTable()                    // for all those actions that don't need extra validation
@@ -103,19 +98,43 @@ func generateGranularFlow() Flow {
 	mothInvalid := mothValidator.MakeCopy()
 	mothInvalid.AddFlag("isBrown", false)
 
-	// generate all transitions, adding optional validation tables as we go
+	// generate all transitions, adding validation tables as we go
 	hatchTran := NewTransition(actionHatch)
-	hatchTran.AddStage(stageCaterpillar, blankTable) // there's no validation needed to hatch
+	err := hatchTran.AddStage(&eggStage, blankTable, catStage)
+	if err != nil {
+		fmt.Println(err)
+	}
 
 	growTran := NewTransition(actionGrow)
-	growTran.AddStage(stageCocoon, blankTable)
+	err = growTran.AddStage(&catStage, blankTable, cocoonStage)
+	if err != nil {
+		fmt.Println(err)
+	}
 
 	emergeTran := NewTransition(actionEmerge)
-	emergeTran.AddStage(stageButterfly, mothInvalid)
-	emergeTran.AddStage(stageMoth, mothValidator) // since EMERGE has two possible outcomes, we use validation tables to choose between them
+	err = emergeTran.AddStage(&cocoonStage, mothInvalid, butterflyStage, mothValidator, mothStage)
+	if err != nil {
+		fmt.Println(err)
+	}
 
-	seenTran := NewTransition(actionSeen)        // there's only one possible outcome but we still use a validation table
-	seenTran.AddStage(stageEaten, seenValidator) // attempting to SEEN a green bug will return an error
+	seenTran := NewTransition(actionSeen) // there's only one possible outcome but we still use a validation table
+	err = seenTran.AddStage(&eggStage, seenValidator, eatenStage)
+	if err != nil {
+		fmt.Println(err)
+	}
+	err = seenTran.AddStage(&catStage, seenValidator, eatenStage)
+	if err != nil {
+		fmt.Println(err)
+	}
+	// cocoons can't be seen, so we don't add the Cocoon stage
+	err = seenTran.AddStage(&butterflyStage, seenValidator, eatenStage)
+	if err != nil {
+		fmt.Println(err)
+	}
+	err = seenTran.AddStage(&mothStage, seenValidator, eatenStage)
+	if err != nil {
+		fmt.Println(err)
+	}
 
 	// add all the stages and transitions to the flow
 	tempButterflyFlow.AddStages(eggStage, catStage, cocoonStage, butterflyStage, mothStage)
@@ -132,23 +151,18 @@ func generateSimpleFlow() Flow {
 	// generate a flow object with setters and getters for butterfly struct
 	tempButterflyFlow := NewFlow(getButterflyStatus, setButterflyStatus, getButterflyContext)
 
-	// Generate all stages, adding transiton names as we go
+	// Generate all stages
 	eggStage := NewStage(stageEgg)
-	eggStage.AddTransition(actionAge)
-	eggStage.AddTransition(actionSeen)
 
 	catStage := NewStage(stageCaterpillar)
-	catStage.AddTransition(actionAge)
-	catStage.AddTransition(actionSeen)
 
-	cocoonStage := NewStage(stageCocoon) // cocoons can't be seen, so we don't add the SEEN transition
-	cocoonStage.AddTransition(actionAge)
+	cocoonStage := NewStage(stageCocoon)
 
 	butterflyStage := NewStage(stageButterfly) // butterflies and moths can't grow any more, they just eventually get seen and eaten
-	butterflyStage.AddTransition(actionSeen)
 
 	mothStage := NewStage(stageMoth)
-	mothStage.AddTransition(actionSeen)
+
+	eatenStage := NewStage(stageEaten)
 
 	// generate some validation tables
 	blankTable, _ := NewValidationTable()                    // for all those actions that don't need extra validation
@@ -158,15 +172,39 @@ func generateSimpleFlow() Flow {
 	mothInvalid := mothValidator.MakeCopy()
 	mothInvalid.AddFlag("isBrown", false)
 
-	// generate all transitions, adding optional validation tables as we go
+	// generate all transitions, adding validation tables as we go
 	ageTran := NewTransition(actionAge)
-	ageTran.AddStage(stageCaterpillar, blankTable, stageEgg)    // The same transition can have different outcomes
-	ageTran.AddStage(stageCocoon, blankTable, stageCaterpillar) // just based on the stage
-	ageTran.AddStage(stageButterfly, mothInvalid, stageCocoon)
-	ageTran.AddStage(stageMoth, mothValidator, stageCocoon) // since EMERGE has two possible outcomes, we use validation tables to choose between them
+	err := ageTran.AddStage(&eggStage, blankTable, catStage)
+	if err != nil {
+		fmt.Println(err)
+	}
+	err = ageTran.AddStage(&catStage, blankTable, cocoonStage)
+	if err != nil {
+		fmt.Println(err)
+	}
+	err = ageTran.AddStage(&cocoonStage, mothInvalid, butterflyStage, mothValidator, mothStage)
+	if err != nil {
+		fmt.Println(err)
+	}
 
-	seenTran := NewTransition(actionSeen)        // there's only one possible outcome but we still use a validation table
-	seenTran.AddStage(stageEaten, seenValidator) // attempting to SEEN a green bug will return an error
+	seenTran := NewTransition(actionSeen) // there's only one possible outcome but we still use a validation table
+	err = seenTran.AddStage(&eggStage, seenValidator, eatenStage)
+	if err != nil {
+		fmt.Println(err)
+	}
+	err = seenTran.AddStage(&catStage, seenValidator, eatenStage)
+	if err != nil {
+		fmt.Println(err)
+	}
+	// cocoons can't be seen, so we don't add the Cocoon stage
+	err = seenTran.AddStage(&butterflyStage, seenValidator, eatenStage)
+	if err != nil {
+		fmt.Println(err)
+	}
+	err = seenTran.AddStage(&mothStage, seenValidator, eatenStage)
+	if err != nil {
+		fmt.Println(err)
+	}
 
 	// add all the stages and transitions to the flow
 	tempButterflyFlow.AddStages(eggStage, catStage, cocoonStage, butterflyStage, mothStage)
