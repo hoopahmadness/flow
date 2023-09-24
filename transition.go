@@ -25,7 +25,7 @@ func (t *Transition) AddStage(originStage *Stage, nextSteps ...interface{}) erro
 		return fmt.Errorf("Pairs of validation tables and destination stages are required for next steps")
 	}
 	originStage.addTransition(t.Name)
-	for ii := 0; ii < len(nextSteps); ii += 2 {
+	for ii := 0; ii < len(nextSteps); ii += 2 { // what if I pass in no next steps?
 		valTable, OK := nextSteps[ii].(ValidationTable)
 		if !OK {
 			return fmt.Errorf("Expected a valudation table, got %T", nextSteps[ii])

@@ -7,23 +7,23 @@ import (
 	"github.com/pkg/errors"
 )
 
-type UnfinishedFlow struct {
+type UnfinishedFlow[Asset any] struct {
 	Stages        map[string]Stage
 	Transitions   map[string]Transition
-	statusGetter  func(interface{}) (string, error)
-	statusSetter  func(interface{}, string) error
-	contextGetter func(interface{}) (ValidationTable, error)
+	statusGetter  func(*Asset) (string, error) // perhaps generics would be useful here!
+	statusSetter  func(*Asset, string) error
+	contextGetter func(*Asset) (ValidationTable, error)
 }
-type Flow struct {
+type Flow[Asset any] struct {
 	stages        map[string]Stage
 	transitions   map[string]Transition
-	statusGetter  func(interface{}) (string, error)
-	statusSetter  func(interface{}, string) error
-	contextGetter func(interface{}) (ValidationTable, error)
+	statusGetter  func(*Asset) (string, error)
+	statusSetter  func(*Asset, string) error
+	contextGetter func(*Asset) (ValidationTable, error)
 }
 
-func (f UnfinishedFlow) Finish() Flow {
-	newFlow := Flow{
+func (f UnfinishedFlow[Asset]) Finish() Flow[Asset] {
+	newFlow := Flow[Asset]{
 		stages:        f.Stages,
 		transitions:   f.Transitions,
 		statusGetter:  f.statusGetter,
@@ -33,12 +33,12 @@ func (f UnfinishedFlow) Finish() Flow {
 	return newFlow
 }
 
-func NewFlow(
-	statusGetter func(interface{}) (string, error),
-	statusSetter func(interface{}, string) error,
-	contextGetter func(interface{}) (ValidationTable, error),
-) UnfinishedFlow {
-	return UnfinishedFlow{
+func NewFlow[Asset any](
+	statusGetter func(*Asset) (string, error),
+	statusSetter func(*Asset, string) error,
+	contextGetter func(*Asset) (ValidationTable, error),
+) UnfinishedFlow[Asset] {
+	return UnfinishedFlow[Asset]{
 		Stages:        map[string]Stage{},
 		Transitions:   map[string]Transition{},
 		statusGetter:  statusGetter,
@@ -47,22 +47,22 @@ func NewFlow(
 	}
 }
 
-func (f *UnfinishedFlow) AddStages(stages ...Stage) {
+func (f *UnfinishedFlow[Asset]) AddStages(stages ...Stage) {
 	for _, stage := range stages {
 		f.Stages[stage.Name] = stage
 	}
 }
 
-func (f *UnfinishedFlow) AddTransitions(transitions ...Transition) {
+func (f *UnfinishedFlow[Asset]) AddTransitions(transitions ...Transition) {
 	for _, transition := range transitions {
 		f.Transitions[transition.Name] = transition
 	}
 }
 
-func (f Flow) TakeAction(asset interface{}, action string) (string, error) {
+func (f Flow[Asset]) TakeAction(asset *Asset, action string) (string, error) {
 	// check if asset is a pointer
 	if !isPointer(asset) {
-		return INVALID, fmt.Errorf("please pass a pointer to your asset in CheckRequest()")
+		return INVALID, fmt.Errorf("please pass a pointer to your asset in TakeAction()")
 	}
 
 	// check if action is part of our flow
@@ -116,5 +116,5 @@ func contains(list []string, single string) bool {
 }
 
 func isPointer(asset interface{}) bool {
-	return reflect.ValueOf(asset).Type().Kind() == reflect.Ptr
+	return reflect.ValueOf(asset).Type().Kind() == reflect.Pointer
 }

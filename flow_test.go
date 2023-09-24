@@ -1,7 +1,6 @@
 package flowchart
 
 import (
-	"errors"
 	"fmt"
 	"testing"
 )
@@ -31,31 +30,18 @@ type Butterfly struct {
 }
 
 // These three functions will be passed into the NewFlow() function, allowing it to interact with our asset.
-func getButterflyStatus(asset interface{}) (string, error) {
-	bug, OK := asset.(*Butterfly)
-	if !OK {
-		return "", errors.New("")
-	}
+func getButterflyStatus(bug *Butterfly) (string, error) {
 	return bug.lifeStage, nil
 }
 
-func setButterflyStatus(asset interface{}, status string) error {
-	bug, OK := asset.(*Butterfly)
-	if !OK {
-		return errors.New("")
-	}
+func setButterflyStatus(bug *Butterfly, status string) error {
 	bug.lifeStage = status
 	return nil
 }
 
 // For a Butterfly, these are the important values to validate. This function should validate any conditional that will be
 // used by any one of your Transitions. A Transition might check one or more of these values; any extra flags won't cause trouble.
-func getButterflyContext(asset interface{}) (ValidationTable, error) {
-	bug, OK := asset.(*Butterfly)
-	if !OK {
-		return ValidationTable{}, errors.New("")
-	}
-
+func getButterflyContext(bug *Butterfly) (ValidationTable, error) {
 	greenTag := "isGreen"
 	isGreen := bug.color == "green"
 
@@ -73,7 +59,7 @@ func getButterflyContext(asset interface{}) (ValidationTable, error) {
 // At almost any point it can be seen and eaten by a bird, but this only happens to non-green ones
 // coccoons are also safe from being eaten
 // Some butterflies (the brown ones) are secretly moths! So when they EMERGE they are moths, not butterflies
-func generateGranularFlow() Flow {
+func generateGranularFlow() Flow[Butterfly] {
 	// generate a flow object with setters and getters for butterfly struct
 	tempButterflyFlow := NewFlow(getButterflyStatus, setButterflyStatus, getButterflyContext)
 
@@ -147,7 +133,7 @@ func generateGranularFlow() Flow {
 }
 
 // Same flow as above, but all growing actions are replaced with the simplified Age action
-func generateSimpleFlow() Flow {
+func generateSimpleFlow() Flow[Butterfly] {
 	// generate a flow object with setters and getters for butterfly struct
 	tempButterflyFlow := NewFlow(getButterflyStatus, setButterflyStatus, getButterflyContext)
 
@@ -222,7 +208,7 @@ type butterflyTest struct {
 	wantError bool
 }
 
-func runButterflyTests(bug *Butterfly, testBatch []butterflyTest, generateFlow func() Flow, t *testing.T) {
+func runButterflyTests(bug *Butterfly, testBatch []butterflyTest, generateFlow func() Flow[Butterfly], t *testing.T) {
 	flow := generateFlow()
 
 	for _, test := range testBatch {
