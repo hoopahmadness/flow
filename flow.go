@@ -7,43 +7,33 @@ import (
 	"github.com/pkg/errors"
 )
 
-type UnfinishedFlow[Asset any] struct {
-	Stages        map[string]Stage
-	Transitions   map[string]Transition
-	statusGetter  func(*Asset) (string, error) // perhaps generics would be useful here!
-	statusSetter  func(*Asset, string) error
-	contextGetter func(*Asset) (ValidationTable, error)
+type Flowable interface {
+	GetStatus() (string, error)
+	SetStatus(string) error
+	GetContext() (ValidationTable, error)
 }
-type Flow[Asset any] struct {
-	stages        map[string]Stage
-	transitions   map[string]Transition
-	statusGetter  func(*Asset) (string, error)
-	statusSetter  func(*Asset, string) error
-	contextGetter func(*Asset) (ValidationTable, error)
+
+type UnfinishedFlow[Asset Flowable] struct {
+	Stages      map[string]Stage
+	Transitions map[string]Transition
+}
+type Flow[Asset Flowable] struct {
+	stages      map[string]Stage
+	transitions map[string]Transition
 }
 
 func (f UnfinishedFlow[Asset]) Finish() Flow[Asset] {
 	newFlow := Flow[Asset]{
-		stages:        f.Stages,
-		transitions:   f.Transitions,
-		statusGetter:  f.statusGetter,
-		statusSetter:  f.statusSetter,
-		contextGetter: f.contextGetter,
+		stages:      f.Stages,
+		transitions: f.Transitions,
 	}
 	return newFlow
 }
 
-func NewFlow[Asset any](
-	statusGetter func(*Asset) (string, error),
-	statusSetter func(*Asset, string) error,
-	contextGetter func(*Asset) (ValidationTable, error),
-) UnfinishedFlow[Asset] {
+func NewFlow[Asset Flowable]() UnfinishedFlow[Asset] {
 	return UnfinishedFlow[Asset]{
-		Stages:        map[string]Stage{},
-		Transitions:   map[string]Transition{},
-		statusGetter:  statusGetter,
-		statusSetter:  statusSetter,
-		contextGetter: contextGetter,
+		Stages:      map[string]Stage{},
+		Transitions: map[string]Transition{},
 	}
 }
 
@@ -59,7 +49,7 @@ func (f *UnfinishedFlow[Asset]) AddTransitions(transitions ...Transition) {
 	}
 }
 
-func (f Flow[Asset]) TakeAction(asset *Asset, action string) (string, error) {
+func (f Flow[Asset]) TakeAction(asset Asset, action string) (string, error) {
 	// check if asset is a pointer
 	if !isPointer(asset) {
 		return INVALID, fmt.Errorf("please pass a pointer to your asset in TakeAction()")
@@ -72,11 +62,11 @@ func (f Flow[Asset]) TakeAction(asset *Asset, action string) (string, error) {
 	}
 
 	// get current stage and validations
-	status, err := f.statusGetter(asset)
+	status, err := asset.GetStatus()
 	if err != nil {
 		return INVALID, err
 	}
-	validations, err := f.contextGetter(asset)
+	validations, err := asset.GetContext()
 	if err != nil {
 		return INVALID, err
 	}
@@ -97,7 +87,7 @@ func (f Flow[Asset]) TakeAction(asset *Asset, action string) (string, error) {
 
 	newStatus, err := tran.getOutcome(validations)
 	if err == nil {
-		if innerErr := f.statusSetter(asset, newStatus); innerErr != nil {
+		if innerErr := asset.SetStatus(newStatus); innerErr != nil {
 			return INVALID, errors.Wrap(innerErr, "call to f.statusSetter failed")
 		}
 	}
