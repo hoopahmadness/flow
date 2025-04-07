@@ -27,6 +27,7 @@ const (
 type Butterfly struct {
 	color     string
 	lifeStage string
+	cocoonAge int
 }
 
 // These three functions let the Butterfly struct implement the Flowable interface
@@ -34,7 +35,10 @@ func (bug *Butterfly) GetStatus() (string, error) {
 	return bug.lifeStage, nil
 }
 
-func (bug *Butterfly) SetStatus(status string) error {
+func (bug *Butterfly) SetStatus(status, action string) error {
+	if bug.lifeStage == stageCocoon && action == actionAge {
+		bug.cocoonAge++
+	}
 	bug.lifeStage = status
 	return nil
 }
@@ -48,10 +52,18 @@ func (bug *Butterfly) GetContext() (ValidationTable, error) {
 	brownTag := "isBrown"
 	isBrown := bug.color == "brown"
 
+	finishedTag := "isFinishedMetamorphosing"
+	isFinished := bug.cocoonAge > 0 && bug.lifeStage == stageCocoon
+
 	unrelatedTag := "isAdult"
 	isAdult := bug.lifeStage == stageButterfly || bug.lifeStage == stageMoth
 
-	return NewValidationTable(greenTag, isGreen, brownTag, isBrown, unrelatedTag, isAdult)
+	return NewValidationTable(
+		greenTag, isGreen,
+		brownTag, isBrown,
+		finishedTag, isFinished,
+		unrelatedTag, isAdult,
+	)
 }
 
 // As an example, we will generate a flow for a butterfly
@@ -153,10 +165,15 @@ func generateSimpleFlow() Flow[*Butterfly] {
 	// generate some validation tables
 	blankTable, _ := NewValidationTable()                    // for all those actions that don't need extra validation
 	seenValidator, _ := NewValidationTable("isGreen", false) // you can only be seen if you aren't green
-	mothValidator, _ := NewValidationTable("isBrown", true)  // only brown bugs turn into moths
+	mothValidator, _ := NewValidationTable(
+		"isFinishedMetamorphosing", true,
+		"isBrown", true,
+	) // only brown bugs turn into moths
 	// if you want to make tweaks to an existing table instead of starting over, make a copy
 	mothInvalid := mothValidator.MakeCopy()
 	mothInvalid.AddFlag("isBrown", false)
+
+	needsMoreTimeValidator, _ := NewValidationTable("isFinishedMetamorphosing", false)
 
 	// generate all transitions, adding validation tables as we go
 	ageTran := NewTransition(actionAge)
@@ -168,7 +185,11 @@ func generateSimpleFlow() Flow[*Butterfly] {
 	if err != nil {
 		fmt.Println(err)
 	}
-	err = ageTran.AddStage(&cocoonStage, mothInvalid, butterflyStage, mothValidator, mothStage)
+	err = ageTran.AddStage(&cocoonStage,
+		mothInvalid, butterflyStage,
+		mothValidator, mothStage,
+		needsMoreTimeValidator, cocoonStage,
+	)
 	if err != nil {
 		fmt.Println(err)
 	}
@@ -270,6 +291,11 @@ func TestSafeButterfliesHappy(t *testing.T) {
 		},
 		{
 			action:    actionAge,
+			result:    stageCocoon,
+			wantError: false,
+		},
+		{
+			action:    actionAge,
 			result:    stageButterfly,
 			wantError: false,
 		},
@@ -311,10 +337,12 @@ func TestSafeButterfliesBranch(t *testing.T) {
 	Janice := Butterfly{
 		color:     "green",
 		lifeStage: stageCocoon,
+		cocoonAge: 1,
 	}
 	Jennifer := Butterfly{
 		color:     "green",
 		lifeStage: stageCocoon,
+		cocoonAge: 1,
 	}
 
 	runButterflyTests(&Janice, butterflyPathGranular, generateGranularFlow, t)
@@ -337,10 +365,12 @@ func TestSafeButterfliesBranch(t *testing.T) {
 	Sandy := Butterfly{
 		color:     "brown",
 		lifeStage: stageCocoon,
+		cocoonAge: 1,
 	}
 	Sidney := Butterfly{
 		color:     "brown",
 		lifeStage: stageCocoon,
+		cocoonAge: 1,
 	}
 
 	runButterflyTests(&Sandy, mothPathGranular, generateGranularFlow, t)
@@ -386,10 +416,12 @@ func TestSafeButterfliesGetEaten(t *testing.T) {
 	Quincy := Butterfly{
 		color:     "red",
 		lifeStage: stageCocoon,
+		cocoonAge: 1,
 	}
 	Quinton := Butterfly{
 		color:     "red",
 		lifeStage: stageCocoon,
+		cocoonAge: 1,
 	}
 	runButterflyTests(&Quincy, eatenPathGranular, generateGranularFlow, t)
 	runButterflyTests(&Quinton, eatenPathSimplified, generateSimpleFlow, t)

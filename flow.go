@@ -9,7 +9,7 @@ import (
 
 type Flowable interface {
 	GetStatus() (string, error)
-	SetStatus(string) error
+	SetStatus(newStatus string, action string) error
 	GetContext() (ValidationTable, error)
 }
 
@@ -87,7 +87,7 @@ func (f Flow[Asset]) TakeAction(asset Asset, action string) (string, error) {
 
 	newStatus, err := tran.getOutcome(validations)
 	if err == nil {
-		if innerErr := asset.SetStatus(newStatus); innerErr != nil {
+		if innerErr := asset.SetStatus(newStatus, action); innerErr != nil {
 			return INVALID, errors.Wrap(innerErr, "call to f.statusSetter failed")
 		}
 	}

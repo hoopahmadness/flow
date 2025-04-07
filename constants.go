@@ -1,7 +1,6 @@
 package flowchart
 
 const (
-	INVALID = "INVALID"
-
+	INVALID         = "INVALID"
 	originStageFlag = "IsFromStage%s"
 )
