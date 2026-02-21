@@ -35,7 +35,8 @@ func (bug *Butterfly) GetStatus() (string, error) {
 	return bug.lifeStage, nil
 }
 
-func (bug *Butterfly) SetStatus(status, action string) error {
+func (bug *Butterfly) SetStatus(status string, actionInfo map[string]any) error {
+	action := actionInfo["action"].(string)
 	if bug.lifeStage == stageCocoon && action == actionAge {
 		bug.cocoonAge++
 	}
@@ -233,7 +234,7 @@ func runButterflyTests(bug *Butterfly, testBatch []butterflyTest, generateFlow f
 	flow := generateFlow()
 
 	for _, test := range testBatch {
-		change, err := flow.TakeAction(bug, test.action)
+		change, err := flow.TakeAction(bug, test.action, nil)
 		if err != nil && !test.wantError {
 			t.Error(err)
 			t.Fail()

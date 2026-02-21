@@ -9,7 +9,7 @@ import (
 
 type Flowable interface {
 	GetStatus() (string, error)
-	SetStatus(newStatus string, action string) error
+	SetStatus(newStatus string, actionInfo map[string]any) error
 	GetContext() (ValidationTable, error)
 }
 
@@ -49,11 +49,16 @@ func (f *UnfinishedFlow[Asset]) AddTransitions(transitions ...Transition) {
 	}
 }
 
-func (f Flow[Asset]) TakeAction(asset Asset, action string) (string, error) {
+func (f Flow[Asset]) TakeAction(asset Asset, action string, actionInfo map[string]any) (string, error) {
 	// check if asset is a pointer
 	if !isPointer(asset) {
 		return INVALID, fmt.Errorf("please pass a pointer to your asset in TakeAction()")
 	}
+
+	if actionInfo == nil {
+		actionInfo = map[string]any{}
+	}
+	actionInfo["action"] = action
 
 	// check if action is part of our flow
 	tran, OK := f.transitions[action]
@@ -87,7 +92,7 @@ func (f Flow[Asset]) TakeAction(asset Asset, action string) (string, error) {
 
 	newStatus, err := tran.getOutcome(validations)
 	if err == nil {
-		if innerErr := asset.SetStatus(newStatus, action); innerErr != nil {
+		if innerErr := asset.SetStatus(newStatus, actionInfo); innerErr != nil {
 			return INVALID, errors.Wrap(innerErr, "call to f.statusSetter failed")
 		}
 	}
