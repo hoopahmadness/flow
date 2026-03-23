@@ -31,22 +31,25 @@ type Butterfly struct {
 }
 
 // These three functions let the Butterfly struct implement the Flowable interface
-func (bug *Butterfly) GetStatus() (string, error) {
+func (bug *Butterfly) GetStatus(logger FlowLogger) (string, error) {
+	logger.Log("Getting butterfly status")
 	return bug.lifeStage, nil
 }
 
-func (bug *Butterfly) SetStatus(status string, actionInfo map[string]any) error {
+func (bug *Butterfly) SetStatus(status string, actionInfo map[string]any, logger FlowLogger) error {
 	action := actionInfo["action"].(string)
 	if bug.lifeStage == stageCocoon && action == actionAge {
 		bug.cocoonAge++
+		logger.Log("Bug aged up", "newAge", bug.cocoonAge)
 	}
 	bug.lifeStage = status
+
 	return nil
 }
 
 // For a Butterfly, these are the important values to validate. This function should validate any conditional that will be
 // used by any one of your Transitions. A Transition might check one or more of these values; any extra flags won't cause trouble.
-func (bug *Butterfly) GetContext() (ValidationTable, error) {
+func (bug *Butterfly) GetContext(_ FlowLogger) (ValidationTable, error) {
 	greenTag := "isGreen"
 	isGreen := bug.color == "green"
 
@@ -232,9 +235,12 @@ type butterflyTest struct {
 
 func runButterflyTests(bug *Butterfly, testBatch []butterflyTest, generateFlow func() Flow[*Butterfly], t *testing.T) {
 	flow := generateFlow()
+	var log FlowLogger = FlowLoggerImpl{}
+	log = log.New("test", true, "bug", bug)
 
 	for _, test := range testBatch {
-		change, err := flow.TakeAction(bug, test.action, nil)
+		log = log.New("currentTest", test)
+		change, err := flow.TakeAction(bug, test.action, nil, log)
 		if err != nil && !test.wantError {
 			t.Error(err)
 			t.Fail()

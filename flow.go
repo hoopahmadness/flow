@@ -3,14 +3,15 @@ package flowchart
 import (
 	"fmt"
 	"reflect"
+	"strings"
 
 	"github.com/pkg/errors"
 )
 
 type Flowable interface {
-	GetStatus() (string, error)
-	SetStatus(newStatus string, actionInfo map[string]any) error
-	GetContext() (ValidationTable, error)
+	GetStatus(logger FlowLogger) (string, error)
+	SetStatus(newStatus string, actionInfo map[string]any, logger FlowLogger) error
+	GetContext(logger FlowLogger) (ValidationTable, error)
 }
 
 type UnfinishedFlow[Asset Flowable] struct {
@@ -49,9 +50,17 @@ func (f *UnfinishedFlow[Asset]) AddTransitions(transitions ...Transition) {
 	}
 }
 
-func (f Flow[Asset]) TakeAction(asset Asset, action string, actionInfo map[string]any) (string, error) {
+func (f Flow[Asset]) TakeAction(asset Asset, action string, actionInfo map[string]any, parentLogger FlowLogger) (string, error) {
+	flowTypeStr := fmt.Sprintf("%T", f)
+	strOpen := strings.Split(flowTypeStr, "[")[1]
+	strClosed := strings.Split(strOpen, "]")[0]
+	logger := parentLogger.New("caller", "flow.TakeAction",
+		"flowType", strClosed,
+		"action", action,
+	)
 	// check if asset is a pointer
 	if !isPointer(asset) {
+		logger.Log("Please pass a pointer to your asset in TakeAction()")
 		return INVALID, fmt.Errorf("please pass a pointer to your asset in TakeAction()")
 	}
 
@@ -67,11 +76,11 @@ func (f Flow[Asset]) TakeAction(asset Asset, action string, actionInfo map[strin
 	}
 
 	// get current stage and validations
-	status, err := asset.GetStatus()
+	status, err := asset.GetStatus(logger)
 	if err != nil {
 		return INVALID, err
 	}
-	validations, err := asset.GetContext()
+	validations, err := asset.GetContext(logger)
 	if err != nil {
 		return INVALID, err
 	}
@@ -92,13 +101,12 @@ func (f Flow[Asset]) TakeAction(asset Asset, action string, actionInfo map[strin
 
 	newStatus, err := tran.getOutcome(validations)
 	if err == nil {
-		if innerErr := asset.SetStatus(newStatus, actionInfo); innerErr != nil {
+		if innerErr := asset.SetStatus(newStatus, actionInfo, logger); innerErr != nil {
 			return INVALID, errors.Wrap(innerErr, "call to f.statusSetter failed")
 		}
 	}
 
 	return newStatus, err
-
 }
 
 func contains(list []string, single string) bool {
