@@ -48,6 +48,18 @@ func (vt ValidationTable) MakeCopy() ValidationTable {
 	return table
 }
 
+func (vt ValidationTable) And(other ValidationTable) ValidationTable {
+	newVT, _ := NewValidationTable()
+	for key, value := range vt.table {
+		newVT.AddFlag(key, value)
+	}
+	for key, value := range other.table {
+		newVT.AddFlag(key, value)
+	}
+
+	return newVT
+}
+
 func (vt ValidationTable) toString() ValidationString {
 	if len(vt.tags) == 0 {
 		return ValidationString(" ")

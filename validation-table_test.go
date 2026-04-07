@@ -94,3 +94,51 @@ func TestSafeValidationTableMeetRequirements(t *testing.T) {
 
 	}
 }
+
+func TestSafeCombineValidationTales(t *testing.T) {
+	// combine two blank VTs
+	blank1, _ := NewValidationTable()
+	blank2, _ := NewValidationTable()
+	combinedBlank := blank1.And(blank2)
+	if combinedBlank.toString() != " " {
+		t.Errorf("Expected a new blank table to be created")
+	}
+
+	// Combine populated table with blank
+	pop1, _ := NewValidationTable("valA", true, "valB", true)
+	combined1 := pop1.And(blank1)
+	if combined1.toString() != "valA:true,valB:true" {
+		t.Errorf("Did not get the expected combination of pop1 and blank1, got %s instead", combined1.toString())
+	}
+	if blank1.toString() != " " {
+		t.Errorf("Combining tables should not change the second starting table")
+	}
+
+	combined1b := blank1.And(pop1)
+	if combined1b.toString() != combined1.toString() {
+		t.Errorf("Expected %s, got %s", combined1.toString(), combined1b.toString())
+	}
+
+	if blank1.toString() != " " {
+		t.Errorf("Combining tables should not change the first starting table")
+	}
+	// combine two populated tables
+	pop2, _ := NewValidationTable("valB", false, "valC", false, "valD", false)
+	combined2 := pop1.And(pop2)
+	if combined2.toString() != "valA:true,valB:false,valC:false,valD:false" {
+		t.Errorf("Expected 'valA:true,valB:false,valC:false,valD:false', got %s", combined2.toString())
+	}
+
+	// combine them backwards
+	combined2R := pop2.And(pop1)
+	if combined2R.toString() != "valA:true,valB:true,valC:false,valD:false" {
+		t.Errorf("Expected second table to overwrite shared values of first table, got %s", combined2R.toString())
+	}
+
+	//combine 3 in a chain
+	pop3, _ := NewValidationTable("valD", true, "valE", true)
+	combined3 := pop1.And(pop2).And(pop3)
+	if combined3.toString() != "valA:true,valB:false,valC:false,valD:true,valE:true" {
+		t.Errorf("Problem combining 3 tables in a chain, expected valA:true,valB:false,valC:false,valD:true,valE:true got %s", combined3.toString())
+	}
+}
