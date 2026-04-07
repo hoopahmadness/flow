@@ -6,18 +6,20 @@ import (
 )
 
 type Transition struct {
-	Name       string                      `json:"name"`
-	NextStages map[ValidationString]string `json:"nextStages"`
+	Name           string                      `json:"name"`
+	NextStages     map[ValidationString]string `json:"nextStages"`
+	ValidationList []ValidationString          `json:"validationList"`
 }
 
 func NewTransition(name string) Transition {
 	return Transition{
-		Name:       name,
-		NextStages: map[ValidationString]string{},
+		Name:           name,
+		NextStages:     map[ValidationString]string{},
+		ValidationList: []ValidationString{},
 	}
 }
 
-func (t *Transition) AddStage(originStage *Stage, nextSteps ...interface{}) error {
+func (t *Transition) AddStage(originStage *Stage, nextSteps ...any) error {
 	if originStage == nil {
 		return fmt.Errorf("Unable to add stage with nil origin")
 	}
@@ -37,12 +39,15 @@ func (t *Transition) AddStage(originStage *Stage, nextSteps ...interface{}) erro
 		originFlag := fmt.Sprintf(originStageFlag, originStage.Name)
 		valTable.AddFlag(originFlag, true)
 		t.NextStages[valTable.toString()] = nextStage.Name
+		t.ValidationList = append(t.ValidationList, valTable.toString())
 	}
 	return nil
 }
 
 func (t Transition) getOutcome(incomingTable ValidationTable) (string, error) {
-	for canonVals, status := range t.NextStages {
+	for _, canonVals := range t.ValidationList {
+		status := t.NextStages[canonVals]
+		// for canonVals, status := range t.NextStages {
 		canonTable, err := canonVals.toTable()
 		if err != nil {
 			return INVALID, err

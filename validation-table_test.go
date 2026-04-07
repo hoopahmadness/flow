@@ -7,28 +7,28 @@ import (
 func TestSafeValidationTableCreation(t *testing.T) {
 	type creationTest struct {
 		note      string
-		args      []interface{}
+		args      []any
 		wantError bool
 	}
 	creationTests := []creationTest{
 		{
 			note:      "create a blank table",
-			args:      []interface{}{},
+			args:      []any{},
 			wantError: false,
 		},
 		{
 			note:      "create a table with tags",
-			args:      []interface{}{"first", true, "second", false, "third", true},
+			args:      []any{"first", true, "second", false, "third", true},
 			wantError: false,
 		},
 		{
 			note:      "create a table with badly typed tags",
-			args:      []interface{}{"first", "true"},
+			args:      []any{"first", "true"},
 			wantError: true,
 		},
 		{
 			note:      "create a table with odd number of tags, want error",
-			args:      []interface{}{"first", true, "second"},
+			args:      []any{"first", true, "second"},
 			wantError: true,
 		},
 	}
